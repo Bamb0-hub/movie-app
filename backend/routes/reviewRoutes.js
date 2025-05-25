@@ -1,5 +1,3 @@
-// backend/routes/reviewRoutes.js
-
 const express = require('express');
 const router  = express.Router();
 const jwt     = require('jsonwebtoken');
@@ -21,8 +19,8 @@ function authenticateToken(req, res, next) {
       console.error('❌ JWT verify error:', err);
       return res.status(403).json({ error: 'Invalid token' });
     }
-    console.log('✅ JWT payload:', payload);               // <-- logging
-    req.user = user;  // { id, username, role }
+    console.log('✅ JWT payload:', payload);
+    req.user = payload;  // <-- σωστό
     next();
   });
 }
