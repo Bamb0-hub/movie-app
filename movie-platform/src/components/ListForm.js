@@ -19,7 +19,7 @@ const ListForm = () => {
 
   return (
     <div>
-      <h2>Δημιουργία Νέας Λίστας</h2>
+      <h2>Δημιουργια Νέας Λίστας</h2>
       {success && <p style={{ color: 'green' }}>✅ Η λίστα δημιουργήθηκε!</p>}
       <form onSubmit={handleSubmit}>
         <div>

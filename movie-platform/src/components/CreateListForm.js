@@ -1,55 +1,52 @@
+// src/components/CreateListForm.js
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 
-const CreateListForm = () => {
-  const [name, setName]     = useState('');
-  const [error, setError]   = useState('');
-  const [success, setSuccess] = useState('');
+function CreateListForm({ onCreated }) {
+  const [name, setName]       = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState(null);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault();
-    if (!name.trim()) {
-      setError('Όνομα λίστας απαιτείται');
-      return;
-    }
-    setError(''); setSuccess(''); setLoading(true);
+    if (!name.trim()) return;
+
+    setLoading(true);
+    setError(null);
 
     try {
-      const token = localStorage.getItem('token');
-      const res   = await axios.post(
-        'http://localhost:5000/api/lists/add',
-        { name: name.trim() },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setSuccess(`Δημιουργήθηκε η λίστα "${res.data.name}"`);
+      const res = await api.post('/lists', { name: name.trim() });
+
+      if (typeof onCreated === 'function') {
+        onCreated(res.data);
+      }
+      // Ειδοποιούμε όλα τα AddToListForm να ξαναφορτώσουν
+      window.dispatchEvent(new Event('listCreated'));
+
       setName('');
     } catch (err) {
-      setError(err.response?.data?.error || 'Κάτι πήγε στραβά');
+      console.error('Create list error:', err);
+      setError(err.response?.data?.error || err.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ maxWidth: 400, margin: '0 auto' }}>
-      <h3>Νέα Προσωπική Λίστα</h3>
-      <form onSubmit={handleSubmit}>
-        <label>Όνομα Λίστας</label>
-        <input
-          type="text"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          disabled={loading}
-        />
-        <button type="submit" disabled={loading}>
-          {loading ? 'Δημιουργία...' : 'Δημιουργία Λίστας'}
-        </button>
-      </form>
-      {error   && <p className="error">{error}</p>}
-      {success && <p className="success">{success}</p>}
-    </div>
+    <form onSubmit={handleSubmit} style={{ marginBottom: '1rem' }}>
+      <input
+        type="text"
+        value={name}
+        onChange={e => setName(e.target.value)}
+        placeholder="Όνομα νέας λίστας"
+        disabled={loading}
+      />
+      <button type="submit" disabled={loading}>
+        {loading ? 'Δημιουργια...' : 'Δημιουργια Λιστας'}
+      </button>
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+    </form>
   );
-};
+}
 
 export default CreateListForm;

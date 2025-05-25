@@ -1,91 +1,105 @@
-// routes/authRoutes.js
 const express = require('express');
 const router  = express.Router();
 const User    = require('../models/User');
 const bcrypt  = require('bcrypt');
-const jwt     = require('jsonwebtoken');       
+const jwt     = require('jsonwebtoken');
+require('dotenv').config();
 
-// =======================
+// Σταθερές
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL?.toLowerCase() || '';
+// Επιτρεπόμενα domains για email εγγραφής
+const ALLOWED_DOMAINS = ['gmail.com', 'hotmail.com', 'yahoo.com'];
+
 // Register Route
-// =======================
 router.post('/register', async (req, res) => {
   const { username, email, password } = req.body;
 
+  // Έλεγχος υποχρεωτικών πεδίων
   if (!username || !email || !password) {
-    return res.status(400).json({ error: 'Όλα τα πεδία είναι υποχρεωτικά' });
+    return res.status(400).json({ error: 'Όλα τα πεδία είναι υποχρεωτικά.' });
+  }
+  // Έλεγχος επιτρεπόμενου domain email
+  const domain = email.toLowerCase().split('@')[1] || '';
+  if (!ALLOWED_DOMAINS.includes(domain)) {
+    return res.status(400).json({
+      error: 'Χρησιμοποίησε έγκυρο email (gmail.com, hotmail.com, yahoo.com).'
+    });
   }
 
   try {
-    const existingUser = await User.findOne({ email });
+    // Έλεγχος υπάρχοντος χρήστη με το ίδιο email
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
+      return res.status(400).json({ error: 'Το email υπάρχει ήδη.' });
+    }
+    // Έλεγχος υπάρχοντος χρήστη με το ίδιο username
+    const existingUser = await User.findOne({ username });
     if (existingUser) {
-      return res.status(400).json({ error: 'User already exists' });
+      return res.status(400).json({ error: 'Το όνομα χρήστη υπάρχει ήδη.' });
     }
 
+    // Hash κωδικού
     const hashedPassword = await bcrypt.hash(password, 10);
+    const isAdmin = email.toLowerCase() === ADMIN_EMAIL;
 
     const newUser = new User({
       username,
       email,
-      password: hashedPassword
+      password: hashedPassword,
+      role: isAdmin ? 'admin' : 'user'
     });
 
     await newUser.save();
-    res.status(201).json({ message: 'User created successfully' });
+    return res.status(201).json({ message: 'User created successfully', role: newUser.role });
 
   } catch (err) {
     console.error('Registration error:', err);
-    res.status(500).json({ error: 'Server error' });
+    // Duplicate key (επιπλέον ασφαλεία)
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern)[0];
+      let msg = 'Κάποιο πεδίο υπάρχει ήδη.';
+      if (field === 'username') msg = 'Το όνομα χρήστη υπάρχει ήδη.';
+      if (field === 'email') msg = 'Το email υπάρχει ήδη.';
+      return res.status(400).json({ error: msg });
+    }
+    return res.status(500).json({ error: 'Server error' });
   }
 });
 
-
+// Login Route
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
-  console.log('➡️ Login attempt for:', email, ' / password:', password ? '***' : '[empty]');
-
   if (!email || !password) {
-    console.log('❌ Missing email or password');
-    return res.status(400).json({ error: 'Email and password are required' });
+    return res.status(400).json({ error: 'Email και κωδικός απαιτούνται.' });
   }
 
   try {
-    // 1) Έλεγξε αν βρίσκει χρήστη
     const user = await User.findOne({ email });
-    console.log('🔍 User lookup result:', user);
-
     if (!user) {
-      console.log('❌ User not found');
       return res.status(401).json({ error: 'Ο χρήστης δεν βρέθηκε.' });
     }
 
-    // 2) Έλεγξε password
     const isMatch = await bcrypt.compare(password, user.password);
-    console.log('🔑 Password match:', isMatch);
-
     if (!isMatch) {
-      console.log('❌ Incorrect password');
       return res.status(401).json({ error: 'Λάθος κωδικός.' });
     }
 
-    // 3) Βεβαιώσου ότι διαβάζεις το secret σωστά
-    console.log('🔐 JWT_SECRET is:', process.env.JWT_SECRET);
-
-    // 4) Δημιουργία token
     const token = jwt.sign(
-      { id: user._id, username: user.username },
-      process.env.JWT_SECRET,      // χωρίς fallback εδώ
+      { id: user._id, username: user.username, role: user.role },
+      process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
-    console.log('✅ Token generated:', token);
-
-    return res.status(200).json({
+      return res.status(200).json({
       message: 'Επιτυχής σύνδεση!',
       token,
-      user: { id: user._id, email: user.email }
+      user: {
+        id: user._id,
+       username: user.username,   // ← εδώ πια επιστρέφουμε το username
+        role: user.role
+      }
     });
-
   } catch (err) {
-    console.error('❌ Login error caught:', err);
+    console.error('Login error:', err);
     return res.status(500).json({ error: 'Σφάλμα διακομιστή.' });
   }
 });

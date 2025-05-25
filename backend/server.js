@@ -2,22 +2,28 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const authRoutes = require('./routes/authRoutes');
-const listRoutes = require('./routes/lists');
-const movieRoutes = require('./routes/movies');
+const path = require('path');
+
+const authRoutes   = require('./routes/authRoutes');
+const movieRoutes  = require('./routes/movies');
+const listRoutes   = require('./routes/lists');
 const reviewRoutes = require('./routes/reviewRoutes');
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+// Serve uploaded images statically
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/movies', movieRoutes);
 app.use('/api/lists', listRoutes);
-app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/user', require('./routes/userRoutes'));
 
 
 // Test route

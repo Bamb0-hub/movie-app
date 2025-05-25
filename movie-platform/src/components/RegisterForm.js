@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const RegisterForm = ({ onRegisterSuccess }) => {
+const RegisterForm = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
@@ -9,18 +9,31 @@ const RegisterForm = ({ onRegisterSuccess }) => {
   const [success, setSuccess]   = useState('');
   const [loading, setLoading]   = useState(false);
 
+  // Επιτρεπόμενοι domains για έλεγχο email
+  const allowedDomains = ['gmail.com', 'hotmail.com', 'yahoo.com'];
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!username.trim() || !email.trim() || !password.trim()) {
-      setError('Συμπλήρωσε όλα τα πεδία.');
-      return;
-    }
+    // Καθαρισμός προηγούμενων μηνυμάτων
     setError('');
     setSuccess('');
-    setLoading(true);
 
+    // Έλεγχος υποχρεωτικών πεδίων
+    if (!username.trim() || !email.trim() || !password.trim()) {
+      setError('Παρακαλώ συμπλήρωσε όλα τα υποχρεωτικά πεδία.');
+      return;
+    }
+
+    // Έλεγχος επιτρεπόμενου domain
+    const domain = email.trim().split('@')[1]?.toLowerCase() || '';
+    if (!allowedDomains.includes(domain)) {
+      setError('Χρησιμοποίηστε έγκυρο email.');
+      return;
+    }
+
+    setLoading(true);
     try {
-      const res = await axios.post(
+      await axios.post(
         'http://localhost:5000/api/auth/register',
         { username: username.trim(), email: email.trim(), password },
         { headers: { 'Content-Type': 'application/json' } }
@@ -29,8 +42,9 @@ const RegisterForm = ({ onRegisterSuccess }) => {
       setUsername('');
       setEmail('');
       setPassword('');
-      onRegisterSuccess && onRegisterSuccess();
     } catch (err) {
+      // Καθαρισμός success σε περίπτωση σφάλματος
+      setSuccess('');
       const body = err.response?.data;
       setError(body?.error || body?.message || 'Σφάλμα κατά την εγγραφή.');
     } finally {
@@ -40,14 +54,13 @@ const RegisterForm = ({ onRegisterSuccess }) => {
 
   return (
     <div style={{ maxWidth: 400, margin: '0 auto' }}>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <label>Όνομα Χρήστη:</label>
         <input
           type="text"
           value={username}
           onChange={e => setUsername(e.target.value)}
-          placeholder="Π.χ. john_doe"
-          required
+          placeholder="Username"
         />
 
         <label>Email:</label>
@@ -55,8 +68,7 @@ const RegisterForm = ({ onRegisterSuccess }) => {
           type="email"
           value={email}
           onChange={e => setEmail(e.target.value)}
-          placeholder="email@domain.com"
-          required
+          placeholder="example@mail.com"
         />
 
         <label>Κωδικός:</label>
@@ -65,11 +77,22 @@ const RegisterForm = ({ onRegisterSuccess }) => {
           value={password}
           onChange={e => setPassword(e.target.value)}
           placeholder="••••••••"
-          required
         />
 
-        <button type="submit" disabled={loading}>
-          {loading ? 'Εγγραφη...' : 'Εγγραφη'}
+        <button
+         type="submit"
+          style={{
+            display: 'block',
+            width: '100%',
+            padding: '0.75rem',
+            backgroundColor: '#007BFF',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          {loading ? 'Εγγραφη..' : 'Εγγραφη'}
         </button>
       </form>
 

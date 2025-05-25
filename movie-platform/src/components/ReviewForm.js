@@ -1,45 +1,47 @@
 // src/components/ReviewForm.js
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 
 const ReviewForm = ({ movieId, onNewReview = () => {} }) => {
-  const [rating, setRating]   = useState(5);
+  const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
-  const [error, setError]     = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!movieId || !rating) {
       setError('Απαραίτητο rating & ταινία');
       return;
     }
+    if (comment.trim() === '') {
+      setError('Παρακαλώ γράψε την κριτική σου.');
+      return;
+    }
+
     setError('');
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
-      const res   = await axios.post(
-        'http://localhost:5000/api/reviews/add',
-        { movieId, rating, comment },
-        { headers: { Authorization: `Bearer ${token}` } }
+      const res = await api.post(
+        '/reviews/add',
+        { movieId, rating, comment: comment.trim() }
       );
-      console.log('✅ ReviewForm submit success:', res.data);
-      onNewReview(res.data);
+
+      const newReview = res.data;
+      onNewReview(newReview);
+
+      // Εκπομπή global event για ανανέωση της λίστας
+      window.dispatchEvent(new Event('reviewCreated'));
+
       setComment('');
     } catch (err) {
-      // Αναλυτικό logging για debugging
-      console.error('❌ ReviewForm error object:', err);
+      console.error('ReviewForm error:', err);
+      const body = err.response?.data;
       const status = err.response?.status;
-      const body   = err.response?.data;
-      console.log('🛑 Response status:', status);
-      console.log('🛑 Response body:', body);
-
-      // Εμφάνιση ακριβούς μηνύματος λάθους
       setError(
-        body?.error    || 
-        body?.message  || 
-        `Error ${status}: ${err.message}`
+        body?.error || body?.message || `Σφάλμα ${status}: ${err.message}`
       );
     } finally {
       setLoading(false);
@@ -49,11 +51,13 @@ const ReviewForm = ({ movieId, onNewReview = () => {} }) => {
   return (
     <form onSubmit={handleSubmit} style={{ marginTop: '1rem' }}>
       <label>Βαθμολογία:</label>
-      <select value={rating} onChange={(e) => setRating(+e.target.value)}>
+      <select
+        value={rating}
+        onChange={(e) => setRating(+e.target.value)}
+        disabled={loading}
+      >
         {[1, 2, 3, 4, 5].map((n) => (
-          <option key={n} value={n}>
-            {n}★
-          </option>
+          <option key={n} value={n}>{n}★</option>
         ))}
       </select>
 
@@ -63,13 +67,16 @@ const ReviewForm = ({ movieId, onNewReview = () => {} }) => {
         onChange={(e) => setComment(e.target.value)}
         rows={2}
         placeholder="Σχόλιά σου..."
+        disabled={loading}
       />
 
       <button type="submit" disabled={loading}>
-        {loading ? 'Υποβολή...' : 'Υποβολή Κριτικής'}
+        {loading ? 'Υποβολή...' : 'Υποβολη Κριτικης'}
       </button>
 
-      {error && <p className="error">{error}</p>}
+      {error && (
+        <p style={{ color: 'red', marginTop: '0.5rem' }}>{error}</p>
+      )}
     </form>
   );
 };

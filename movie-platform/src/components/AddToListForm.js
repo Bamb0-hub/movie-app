@@ -1,70 +1,87 @@
+// src/components/AddToListForm.js
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 
-const AddToListForm = ({ movieId }) => {
-  const [lists, setLists]     = useState([]);
-  const [selectedList, setSelectedList] = useState('');
-  const [message, setMessage] = useState('');
+function AddToListForm({ movieId, onAddSuccess }) {
+  const [lists, setLists] = useState([]);
+  const [selectedListId, setSelectedListId] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
 
-  // Φόρτωση των λιστών του χρήστη
+  // Φόρτωση λιστών του χρήστη
+  const fetchLists = async () => {
+    try {
+      const res = await api.get('/lists/my');
+      setLists(res.data);
+    } catch (err) {
+      console.error('Load lists error:', err);
+      setError('Σφάλμα φόρτωσης λιστών');
+    }
+  };
+
   useEffect(() => {
-    const fetchLists = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const userId = payload.id;
-
-        const res = await axios.get(
-          `http://localhost:5000/api/lists/user/${userId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setLists(res.data);
-      } catch (err) {
-        console.error(err);
-        setMessage('Σφάλμα φορτώματος λιστών');
-      }
-    };
     fetchLists();
+    window.addEventListener('listCreated', fetchLists);
+    window.addEventListener('movieAddedToList', fetchLists);
+    return () => {
+      window.removeEventListener('listCreated', fetchLists);
+      window.removeEventListener('movieAddedToList', fetchLists);
+    };
   }, []);
 
   const handleAdd = async (e) => {
     e.preventDefault();
-    if (!selectedList) {
-      setMessage('Επίλεξε λίστα');
-      return;
-    }
+    if (!selectedListId) return;
+    setLoading(true);
+    setError(null);
+    setSuccess(false);
+
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(
-        `http://localhost:5000/api/lists/${selectedList}/add-movie`,
-        { movieId },
-        { headers: { Authorization: `Bearer ${token}` } }
+      const res = await api.post(
+        `/lists/${selectedListId}/add-movie`,
+        { movieId }
       );
-      setMessage('Η ταινία προστέθηκε στη λίστα!');
+      if (onAddSuccess) onAddSuccess(res.data);
+      // Εμφάνιση μηνύματος επιτυχίας
+      setSuccess(true);
+      // Ειδοποίηση για ανανέωση λιστών
+      window.dispatchEvent(new CustomEvent('movieAddedToList', { detail: { listId: selectedListId } }));
+      // Καθαρισμός επιτυχίας μετά 3 δευτερόλεπτα
+      setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
-      console.error(err);
-      setMessage(err.response?.data?.error || 'Σφάλμα προσθήκης');
+      console.error('Add to list error:', err);
+      setError('Αποτυχία προσθήκης στην λίστα');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleAdd} style={{ marginTop: '1rem' }}>
-      <label>Προσθήκη σε λίστα:</label>
-      <select
-        value={selectedList}
-        onChange={e => setSelectedList(e.target.value)}
-      >
-        <option value="">-- Επίλεξε λίστα --</option>
-        {lists.map(list => (
-          <option key={list._id} value={list._id}>
-            {list.name}
-          </option>
-        ))}
-      </select>
-      <button type="submit">Προσθήκη</button>
-      {message && <p className="success">{message}</p>}
+    <form onSubmit={handleAdd} style={{ marginTop: '0.5rem' }}>
+      <label>
+        Προσθήκη σε λίστα:
+        <select
+          value={selectedListId}
+          onChange={e => setSelectedListId(e.target.value)}
+          disabled={loading || lists.length === 0}
+          style={{ marginLeft: '0.5rem' }}
+        >
+          <option value="">-- Επιλέξτε λίστα --</option>
+          {lists.map(list => (
+            <option key={list._id} value={list._id}>
+              {list.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button type="submit" disabled={loading || !selectedListId} style={{ marginLeft: '0.5rem' }}>
+        {loading ? 'Προσθήκη...' : 'ΠΡΟΣΘΗΚΗ'}
+      </button>
+      {success && <p style={{ color: 'green', marginTop: '0.5rem' }}>Η ταινία προστέθηκε επιτυχώς στη λίστα!</p>}
+      {error && <p style={{ color: 'red', marginTop: '0.5rem' }}>{error}</p>}
     </form>
   );
-};
+}
 
 export default AddToListForm;

@@ -1,0 +1,27 @@
+.navbar {
+  display: flex;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: #272727;
+  color: #f0f0f0;
+}
+.navbar-logo {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+.navbar-user {
+  margin-left: auto;
+  font-size: 1rem;
+}
+.badge {
+  padding: 0.3rem 0.8rem;
+  border-radius: 12px;
+}
+.admin-badge {
+  background: #dc2626;
+  color: #fff;
+}
+.user-badge {
+  background: #3b82f6;
+  color: #fff;
+}

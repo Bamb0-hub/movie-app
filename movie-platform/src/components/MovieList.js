@@ -1,55 +1,81 @@
 // src/components/MovieList.js
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import AddToListForm from './AddToListForm';
-import ReviewForm    from './ReviewForm';
-import ReviewList    from './ReviewList';
-import axios         from 'axios';
+import ReviewForm from './ReviewForm';
+import ReviewList from './ReviewList';
 
-const MovieList = () => {
-  const [movies, setMovies] = useState([]);
-
-  useEffect(() => {
-    // Φόρτωση ταινιών/σειρών από backend
-    axios.get('http://localhost:5000/api/movies')
-      .then((res) => {
-        setMovies(res.data);
-      })
-      .catch((err) => {
-        console.error('❌ Failed to fetch movies:', err);
-      });
-  }, []);
+const MovieList = ({ movies, onAddToListSuccess }) => {
+  if (!movies.length) {
+    return <p>Δεν υπάρχουν καταχωρήσεις.</p>;
+  }
 
   return (
-    <div className="movie-list">
+    <div className="movie-list" style={{ padding: '1rem' }}>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+        {movies.map(movie => (
+          <li
+            key={movie._id}
+            className="card"
+            style={{
+              display: 'flex',
+              gap: '1rem',
+              marginBottom: '1.5rem',
+              padding: '1rem',
+              backgroundColor: '#fff',
+              borderRadius: '8px',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+            }}
+          >
+            {/* Εικόνα κάλυψης */}
+            {movie.imageUrl && (
+              <img
+                src={movie.imageUrl}
+                alt={movie.title}
+                style={{
+                  width: '120px',
+                  height: '180px',
+                  objectFit: 'cover',
+                  borderRadius: '4px'
+                }}
+              />
+            )}
 
-      {movies.length === 0 ? (
-        <p>Δεν υπάρχουν καταχωρήσεις.</p>
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {movies.map((movie) => (
-            <li
-              key={movie._id}
-              className="card"
-              style={{ marginBottom: '1.5rem', padding: '1rem' }}
-            >
-              {/* Βασικά Στοιχεία Ταινίας */}
-              <div style={{ marginBottom: '0.5rem' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              {/* Βασικά στοιχεία */}
+              <div style={{ marginBottom: '0.5rem', fontSize: '1.1rem' }}>
                 <strong>{movie.title}</strong>{' '}
-                ({movie.releaseYear}) – {movie.genre} [{movie.type}]
+                <span style={{ color: '#555' }}>({movie.releaseYear})</span>{' '}
+                <span style={{ fontStyle: 'italic', color: '#777' }}>{movie.genre}</span>{' '}
+                <span style={{
+                  background: movie.type === 'movie' ? '#000' : '#eee',
+                  color: movie.type === 'movie' ? '#fff' : '#000',
+                  padding: '0.2em 0.5em',
+                  borderRadius: '4px',
+                  fontSize: '0.85em'
+                }}>
+                  {movie.type === 'movie' ? 'Ταινία' : 'Σειρά'}
+                </span>
               </div>
 
-              {/* Φόρμα Προσθήκης σε Λίστα */}
-              <AddToListForm movieId={movie._id} />
+              {/* Προσθήκη σε λίστα */}
+              <div style={{ marginBottom: '0.75rem' }}>
+                <AddToListForm
+                  movieId={movie._id}
+                  onAddSuccess={onAddToListSuccess}
+                />
+              </div>
 
-              {/* Φόρμα Αξιολόγησης & Κριτικής */}
-              <ReviewForm movieId={movie._id} />
+              {/* Αξιολόγηση */}
+              <div style={{ marginBottom: '0.75rem' }}>
+                <ReviewForm movieId={movie._id} />
+              </div>
 
-              {/* Εμφάνιση Κριτικών */}
+              {/* Εμφάνιση κριτικών */}
               <ReviewList movieId={movie._id} />
-            </li>
-          ))}
-        </ul>
-      )}
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };

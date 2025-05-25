@@ -1,46 +1,46 @@
+// backend/routes/movies.js
 const express = require('express');
-const router = express.Router();
-const Movie = require('../models/Movie');
+const router  = express.Router();
+const Movie   = require('../models/Movie');
+const { authenticateToken, isAdmin } = require('../middleware/auth');
 
-// Create a new movie
-router.post('/add', async (req, res) => {
-  try {
-    const newMovie = new Movie(req.body);
-    await newMovie.save();
-    res.status(201).json({ message: '🎬 Movie added successfully' });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to add movie' });
+// =======================
+// Δημιουργία νέας ταινίας (Admin only)
+// =======================
+router.post(
+  '/add',
+  authenticateToken,   // JWT έλεγχος
+  isAdmin,             // Μόνο admin
+  async (req, res) => {
+    const { title, genre, type, releaseYear, imageUrl } = req.body;
+    // Βασικός validation
+    if (!title || !genre || !type || !releaseYear || !imageUrl) {
+      return res.status(400).json({ error: 'Συμπλήρωσε όλα τα πεδία, συμπεριλαμβανομένου του URL εικόνας.' });
+    }
+
+    try {
+      // Αποθήκευση στο Mongo
+      const newMovie = new Movie({ title, genre, type, releaseYear, imageUrl });
+      await newMovie.save();
+      return res.status(201).json(newMovie);
+    } catch (err) {
+      console.error('Failed to add movie:', err);
+      return res.status(500).json({ error: 'Failed to add movie' });
+    }
   }
-});
+);
 
-// Get all movies
+// =======================
+// Ανάκτηση όλων των ταινιών
+// =======================
 router.get('/', async (req, res) => {
   try {
     const movies = await Movie.find();
     res.json(movies);
   } catch (err) {
+    console.error('Fetch movies error:', err);
     res.status(500).json({ error: 'Failed to fetch movies' });
   }
 });
-
-router.post('/add', async (req, res) => {
-  const { title, genre, year, type } = req.body;
-
-  try {
-    // 🔍 Έλεγχος αν υπάρχει ήδη ταινία με ίδιο τίτλο
-    const existingMovie = await Movie.findOne({ title: title.trim() });
-
-    if (existingMovie) {
-      return res.status(400).json({ error: 'Η ταινία υπάρχει ήδη στη βάση.' });
-    }
-
-    const movie = new Movie({ title, genre, year, type });
-    await movie.save();
-    res.json(movie);
-  } catch (err) {
-    res.status(500).json({ error: 'Σφάλμα κατά την προσθήκη της ταινίας.' });
-  }
-});
-
 
 module.exports = router;

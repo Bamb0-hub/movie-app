@@ -1,62 +1,63 @@
 // backend/routes/reviewRoutes.js
+
 const express = require('express');
 const router  = express.Router();
 const jwt     = require('jsonwebtoken');
 const Review  = require('../models/Review');
 
-// Middleware JWT
+// Middleware JWT έλεγχος
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token      = authHeader && authHeader.split(' ')[1];
   if (!token) {
-    console.log('⚠️ No token provided');
     return res.status(401).json({ error: 'Token required' });
   }
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) {
-      console.error('❌ Token verification failed:', err.message);
       return res.status(403).json({ error: 'Invalid token' });
     }
-    req.user = user;
+    req.user = user;  // { id, username, role }
     next();
   });
 }
 
-// 1) Προσθήκη review (rating + comment)
+// 1) Προσθήκη ή overwrite κριτικής (rating + comment)
 router.post('/add', authenticateToken, async (req, res) => {
-  console.log('➡️ Add Review Request Body:', req.body);
-  console.log('➡️ Authenticated User:', req.user);
-
-  const { movieId, rating, comment } = req.body;
-  if (!movieId || !rating) {
-    console.log('⚠️ Missing movieId or rating');
-    return res.status(400).json({ error: 'movieId and rating required' });
-  }
-
   try {
-    // Check for existing review by this user for that movie
-    let review = await Review.findOne({ movieId, userId: req.user.id });
+    const { movieId, rating, comment } = req.body;
+    if (!movieId || rating == null) {
+      return res.status(400).json({ error: 'movieId and rating required' });
+    }
+
+    // Βρες αν υπάρχει ήδη κριτική από αυτόν τον χρήστη για το συγκεκριμένο movie
+    let review = await Review.findOne({
+      movieId,
+      userId: req.user.id
+    });
+
     if (review) {
+      // Υπάρχει → overwrite
       review.rating  = rating;
       review.comment = comment;
-      console.log('🔄 Updating existing review');
+      review.updatedAt = Date.now();
       await review.save();
-    } else {
-      console.log('➕ Creating new review');
-      review = new Review({
-        movieId,
-        userId: req.user.id,
-        rating,
-        comment
-      });
-      await review.save();
+      return res.status(200).json(review);
     }
-    console.log('✅ Review saved:', review);
-    res.status(201).json(review);
+
+    // Δεν υπάρχει → δημιουργία νέας
+    review = new Review({
+      movieId,
+      userId: req.user.id,
+      rating,
+      comment
+    });
+    await review.save();
+    return res.status(201).json(review);
+
   } catch (err) {
-    console.error('❌ Failed to add review:', err);
-    res.status(500).json({ error: 'Failed to add review' });
+    console.error('❌ Failed to add/update review:', err);
+    return res.status(500).json({ error: 'Failed to add/update review' });
   }
 });
 
@@ -66,27 +67,70 @@ router.get('/movie/:movieId', async (req, res) => {
     const reviews = await Review
       .find({ movieId: req.params.movieId })
       .populate('userId', 'username');
-    res.json(reviews);
+    return res.json(reviews);
   } catch (err) {
     console.error('❌ Fetch reviews failed:', err);
-    res.status(500).json({ error: 'Failed to fetch reviews' });
+    return res.status(500).json({ error: 'Failed to fetch reviews' });
   }
 });
 
-// 3) Ανάκτηση reviews ενός χρήστη (προστατευμένο)
+// 3) Ανάκτηση όλων των reviews ενός χρήστη
 router.get('/user/:userId', authenticateToken, async (req, res) => {
   if (req.user.id !== req.params.userId) {
-    console.log('⚠️ Forbidden: userId mismatch');
     return res.status(403).json({ error: 'Forbidden' });
   }
   try {
     const reviews = await Review
       .find({ userId: req.user.id })
       .populate('movieId', 'title');
-    res.json(reviews);
+    return res.json(reviews);
   } catch (err) {
     console.error('❌ Fetch user reviews failed:', err);
-    res.status(500).json({ error: 'Failed to fetch user reviews' });
+    return res.status(500).json({ error: 'Failed to fetch user reviews' });
+  }
+});
+
+// 4) Ενημέρωση κριτικής (PUT) – προαιρετικό
+router.put('/:reviewId', authenticateToken, async (req, res) => {
+  try {
+    const { rating, comment } = req.body;
+    const review = await Review.findById(req.params.reviewId);
+    if (!review) {
+      return res.status(404).json({ error: 'Review not found' });
+    }
+    if (review.userId.toString() !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    review.rating  = rating ?? review.rating;
+    review.comment = comment ?? review.comment;
+    review.updatedAt = Date.now();
+    await review.save();
+    return res.json(review);
+
+  } catch (err) {
+    console.error('❌ Update review failed:', err);
+    return res.status(500).json({ error: 'Failed to update review' });
+  }
+});
+
+// 5) Διαγραφή κριτικής (DELETE)
+router.delete('/:reviewId', authenticateToken, async (req, res) => {
+  try {
+    const review = await Review.findById(req.params.reviewId);
+    if (!review) {
+      return res.status(404).json({ error: 'Review not found' });
+    }
+    if (review.userId.toString() !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    await review.deleteOne();
+    return res.json({ message: 'Review deleted successfully' });
+
+  } catch (err) {
+    console.error('❌ Delete review failed:', err);
+    return res.status(500).json({ error: 'Failed to delete review' });
   }
 });
 
