@@ -8,15 +8,25 @@ const jwt     = require('jsonwebtoken');
 // Middleware για έλεγχο JWT
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
-  const token      = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Token required' });
+  console.log('🔥 Authorization header:', authHeader);      // <-- logging
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: 'Invalid token' });
-    req.user = user;  // { id, username, role }
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) {
+    console.warn('No token provided');
+    return res.status(401).json({ error: 'Token required' });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, payload) => {
+    if (err) {
+      console.error('❌ JWT verify error:', err);
+      return res.status(403).json({ error: 'Invalid token' });
+    }
+    console.log('✅ JWT payload:', payload);               // <-- logging
+    req.user = payload;
     next();
   });
 }
+
 
 // 1. Δημιουργία νέας λίστας (μόνο authenticated users)
 router.post('/', authenticateToken, async (req, res) => {
