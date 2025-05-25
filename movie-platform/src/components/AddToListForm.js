@@ -51,7 +51,7 @@ function AddToListForm({ movieId, onAddSuccess }) {
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
       console.error('Add to list error:', err);
-      setError('Αποτυχία προσθήκης στην λίστα');
+      setError('Υπαρχει ηδη η ταινια στην λιστα σας');
     } finally {
       setLoading(false);
     }

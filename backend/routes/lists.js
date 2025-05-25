@@ -1,34 +1,24 @@
 // backend/routes/lists.js
 const express = require('express');
 const router  = express.Router();
+const jwt     = require('jsonwebtoken');
 const List    = require('../models/List');
 const User    = require('../models/User');
-const jwt     = require('jsonwebtoken');
 
 // Middleware για έλεγχο JWT
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
-  console.log('🔥 Authorization header:', authHeader);      // <-- logging
-
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) {
-    console.warn('No token provided');
-    return res.status(401).json({ error: 'Token required' });
-  }
+  const token      = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Token required' });
 
   jwt.verify(token, process.env.JWT_SECRET, (err, payload) => {
-    if (err) {
-      console.error('❌ JWT verify error:', err);
-      return res.status(403).json({ error: 'Invalid token' });
-    }
-    console.log('✅ JWT payload:', payload);               // <-- logging
-    req.user = payload;
+    if (err) return res.status(403).json({ error: 'Invalid token' });
+    req.user = payload;  // { id, username, role }
     next();
   });
 }
 
-
-// 1. Δημιουργία νέας λίστας (μόνο authenticated users)
+// 1. Δημιουργία νέας λίστας
 router.post('/', authenticateToken, async (req, res) => {
   const { name } = req.body;
   if (!name || !name.trim()) {
@@ -64,23 +54,31 @@ router.get('/my', authenticateToken, async (req, res) => {
   }
 });
 
-// 3. Προσθήκη ταινίας σε λίστα (μόνο admin χρήστες)
+// 3. Προσθήκη ταινίας σε λίστα (μόνο ο ιδιοκτήτης)
 router.post('/:listId/add-movie', authenticateToken, async (req, res) => {
   const { movieId } = req.body;
   try {
     const list = await List.findById(req.params.listId);
-    if (!list) return res.status(404).json({ error: 'List not found' });
-    
-    // Έλεγχος: μόνο ο ΙΔΙΟΚΤΗΤΗΣ μπορεί να προσθέσει ταινίες στη δική του λίστα
+    if (!list) 
+      return res.status(404).json({ error: 'List not found' });
+
+    // Μόνο ο ιδιοκτήτης της λίστας μπορεί να προσθέσει
     if (list.userId.toString() !== req.user.id) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    // Προσθήκη ταινίας αν δεν υπάρχει ήδη
-    if (!list.movies.includes(movieId)) {
-      list.movies.push(movieId);
-      await list.save();
+    // Έλεγχος διπλοεγγραφής
+    if (list.movies.includes(movieId)) {
+      return res
+        .status(400)
+        .json({ error: 'Η ταινία υπάρχει ήδη στη λίστα σας.' });
     }
+
+    // Προσθήκη ταινίας + πόντοι
+    list.movies.push(movieId);
+    await list.save();
+    await User.findByIdAndUpdate(req.user.id, { $inc: { points: 2 } });
+
     return res.json(list);
   } catch (err) {
     console.error('Add movie error:', err);
