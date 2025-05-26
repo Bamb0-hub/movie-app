@@ -12,8 +12,8 @@ ADMIN_EMAIL=/////@gmail.com
 
 
 
-Μεσα σε Visual Studio Terminal κανουμε τις εντολες:cd backend
-                                                  node server.js
+Μεσα σε Visual Studio Terminal κανουμε τις εντολες:cd backend////
+                                                  node server.js///
 
-Και μετα ανοιγουμε αλλο Terminal στο Visual Studio και κανουμε την εντολη cd movie-platform
+Και μετα ανοιγουμε αλλο Terminal στο Visual Studio και κανουμε την εντολη: cd movie-platform///
                                                                           npm start
